@@ -20,9 +20,9 @@ package enzymeml_v2
 // measurements, equations, and parameters.
 type EnzymeMLDocument struct {
 	Id             int64           `json:"-" gorm:"primaryKey;autoIncrement"`
-	Name           string          `json:"name" `
 	Version        string          `json:"version" `
 	Description    string          `json:"description,omitempty" `
+	Name           string          `json:"name" `
 	Created        string          `json:"created,omitempty" `
 	Modified       string          `json:"modified,omitempty" `
 	Creators       []Creator       `json:"creators" gorm:"many2many:enzymemldocument_creators;"`
@@ -190,6 +190,7 @@ type Parameter struct {
 	InitialValue float64        `json:"initial_value,omitempty" `
 	UpperBound   float64        `json:"upper_bound,omitempty" `
 	LowerBound   float64        `json:"lower_bound,omitempty" `
+	Fit          bool           `json:"fit,omitempty" `
 	Stderr       float64        `json:"stderr,omitempty" `
 	Constant     bool           `json:"constant,omitempty" `
 }
