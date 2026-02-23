@@ -69,6 +69,36 @@ func TestV2Routes_HumaDocsAndOpenAPI(t *testing.T) {
 	if spec["openapi"] == nil {
 		t.Fatalf("expected openapi field in response")
 	}
+
+	paths, ok := spec["paths"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected paths object in OpenAPI response")
+	}
+	creatorPath, ok := paths["/v2/creators"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected /v2/creators path in OpenAPI response")
+	}
+	postOp, ok := creatorPath["post"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected POST operation for /v2/creators")
+	}
+	requestBodyRef := nestedString(postOp, "requestBody", "content", "application/json", "schema", "$ref")
+	if requestBodyRef != "#/components/schemas/Creator" {
+		t.Fatalf("expected creator request schema ref, got %q", requestBodyRef)
+	}
+	createResponseDataRef := nestedString(postOp, "responses", "201", "content", "application/json", "schema", "properties", "data", "$ref")
+	if createResponseDataRef != "#/components/schemas/Creator" {
+		t.Fatalf("expected creator create response data schema ref, got %q", createResponseDataRef)
+	}
+
+	getOp, ok := creatorPath["get"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected GET operation for /v2/creators")
+	}
+	listResponseItemDataRef := nestedString(getOp, "responses", "200", "content", "application/json", "schema", "items", "properties", "data", "$ref")
+	if listResponseItemDataRef != "#/components/schemas/Creator" {
+		t.Fatalf("expected creator list response data schema ref, got %q", listResponseItemDataRef)
+	}
 }
 
 func TestV2Routes_CRUDCreatorAndProtein(t *testing.T) {
@@ -119,6 +149,51 @@ func TestV2Routes_CRUDCreatorAndProtein(t *testing.T) {
 	missingRec := doRequest(t, handler, http.MethodGet, "/v2/proteins/p1", nil)
 	if missingRec.Code != http.StatusNotFound {
 		t.Fatalf("expected %d, got %d: %s", http.StatusNotFound, missingRec.Code, missingRec.Body.String())
+	}
+}
+
+func TestV2Routes_DocumentIgnoresUnknownJSONLDFields(t *testing.T) {
+	handler := newTestHandler(t)
+
+	createRec := doRequest(t, handler, http.MethodPost, "/v2/documents", map[string]interface{}{
+		"@context": "https://example.org/context",
+		"@id":      "urn:example:doc:1",
+		"name":     "jsonld-doc",
+		"version":  "2.0.0",
+		"creators": []map[string]interface{}{
+			{
+				"given_name":  "Ada",
+				"family_name": "Lovelace",
+				"mail":        "ada@example.com",
+				"@type":       "Person",
+				"extra":       "ignored",
+			},
+		},
+		"unexpected_root_field": "ignored",
+	})
+	if createRec.Code != http.StatusCreated {
+		t.Fatalf("POST /v2/documents expected %d, got %d: %s", http.StatusCreated, createRec.Code, createRec.Body.String())
+	}
+
+	var created map[string]interface{}
+	if err := json.Unmarshal(createRec.Body.Bytes(), &created); err != nil {
+		t.Fatalf("failed to decode create response: %v", err)
+	}
+	idRaw, ok := created["id"].(float64)
+	if !ok || idRaw <= 0 {
+		t.Fatalf("expected numeric id in create response, got %#v", created["id"])
+	}
+
+	updateRec := doRequest(t, handler, http.MethodPut, "/v2/documents/1", map[string]interface{}{
+		"@context": "https://example.org/context/v2",
+		"name":     "jsonld-doc-updated",
+		"version":  "2.0.1",
+		"new_extra": map[string]interface{}{
+			"nested": "ignored",
+		},
+	})
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("PUT /v2/documents/1 expected %d, got %d: %s", http.StatusOK, updateRec.Code, updateRec.Body.String())
 	}
 }
 
@@ -205,4 +280,20 @@ func doRequest(t *testing.T, handler http.Handler, method string, path string, p
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	return rec
+}
+
+func nestedString(v interface{}, keys ...string) string {
+	current := v
+	for _, key := range keys {
+		node, ok := current.(map[string]interface{})
+		if !ok {
+			return ""
+		}
+		current, ok = node[key]
+		if !ok {
+			return ""
+		}
+	}
+	value, _ := current.(string)
+	return value
 }

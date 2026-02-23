@@ -102,6 +102,12 @@ func RegisterRoutes(mux *http.ServeMux, manager *database.DBManager, basePath st
 func registerCRUD(api huma.API, h *crudHandler) {
 	name := h.modelType.Name()
 	tag := strings.ToLower(name)
+	modelSchema := h.modelSchema(api)
+	entitySchema := h.entitySchema(api)
+	entityListSchema := &huma.Schema{
+		Type:  "array",
+		Items: entitySchema,
+	}
 
 	huma.Register(api, huma.Operation{
 		OperationID: "create" + name,
@@ -109,6 +115,25 @@ func registerCRUD(api huma.API, h *crudHandler) {
 		Path:        h.resourcePath,
 		Summary:     "Create " + name,
 		Tags:        []string{tag},
+		SkipValidateBody: true,
+		RequestBody: &huma.RequestBody{
+			Required: true,
+			Content: map[string]*huma.MediaType{
+				"application/json": {
+					Schema: modelSchema,
+				},
+			},
+		},
+		Responses: map[string]*huma.Response{
+			strconv.Itoa(http.StatusCreated): {
+				Description: http.StatusText(http.StatusCreated),
+				Content: map[string]*huma.MediaType{
+					"application/json": {
+						Schema: entitySchema,
+					},
+				},
+			},
+		},
 	}, func(ctx context.Context, input *createInput) (*createdOutput, error) {
 		entity := h.newEntity()
 		if err := decodeEntityMap(input.Body, entity); err != nil {
@@ -128,6 +153,16 @@ func registerCRUD(api huma.API, h *crudHandler) {
 		Path:        h.resourcePath,
 		Summary:     "List " + name,
 		Tags:        []string{tag},
+		Responses: map[string]*huma.Response{
+			strconv.Itoa(http.StatusOK): {
+				Description: http.StatusText(http.StatusOK),
+				Content: map[string]*huma.MediaType{
+					"application/json": {
+						Schema: entityListSchema,
+					},
+				},
+			},
+		},
 	}, func(ctx context.Context, input *struct{}) (*listOutput, error) {
 		slicePtr := h.newSlice()
 		if err := h.withPreloads(h.db).Find(slicePtr).Error; err != nil {
@@ -151,6 +186,16 @@ func registerCRUD(api huma.API, h *crudHandler) {
 		Path:        h.resourcePath + "/{id}",
 		Summary:     "Get " + name + " by ID",
 		Tags:        []string{tag},
+		Responses: map[string]*huma.Response{
+			strconv.Itoa(http.StatusOK): {
+				Description: http.StatusText(http.StatusOK),
+				Content: map[string]*huma.MediaType{
+					"application/json": {
+						Schema: entitySchema,
+					},
+				},
+			},
+		},
 	}, func(ctx context.Context, input *idInput) (*entityOutput, error) {
 		id, err := h.parseID(input.ID)
 		if err != nil {
@@ -174,6 +219,25 @@ func registerCRUD(api huma.API, h *crudHandler) {
 		Path:        h.resourcePath + "/{id}",
 		Summary:     "Update " + name,
 		Tags:        []string{tag},
+		SkipValidateBody: true,
+		RequestBody: &huma.RequestBody{
+			Required: true,
+			Content: map[string]*huma.MediaType{
+				"application/json": {
+					Schema: modelSchema,
+				},
+			},
+		},
+		Responses: map[string]*huma.Response{
+			strconv.Itoa(http.StatusOK): {
+				Description: http.StatusText(http.StatusOK),
+				Content: map[string]*huma.MediaType{
+					"application/json": {
+						Schema: entitySchema,
+					},
+				},
+			},
+		},
 	}, func(ctx context.Context, input *updateInput) (*entityOutput, error) {
 		id, err := h.parseID(input.ID)
 		if err != nil {
@@ -426,6 +490,21 @@ func (h *crudHandler) parseID(raw string) (interface{}, error) {
 		return id.Interface(), nil
 	default:
 		return raw, nil
+	}
+}
+
+func (h *crudHandler) modelSchema(api huma.API) *huma.Schema {
+	return api.OpenAPI().Components.Schemas.Schema(h.modelType, true, h.modelType.Name())
+}
+
+func (h *crudHandler) entitySchema(api huma.API) *huma.Schema {
+	return &huma.Schema{
+		Type: "object",
+		Properties: map[string]*huma.Schema{
+			"id": api.OpenAPI().Components.Schemas.Schema(h.primaryKeyTyp, false, h.modelType.Name()+"ID"),
+			"data": h.modelSchema(api),
+		},
+		Required: []string{"id", "data"},
 	}
 }
 
