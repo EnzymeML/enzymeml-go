@@ -18,7 +18,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	enzymeml_v2 "enzymeml/src"
+	enzymeml_v2 "github.com/EnzymeML/enzymeml-go/src"
 )
 
 // DBManager handles database operations for EnzymeML documents.
@@ -26,6 +26,11 @@ import (
 // for interacting with EnzymeML data in a type-safe way.
 type DBManager struct {
 	db *gorm.DB
+}
+
+// DB exposes the underlying GORM DB for advanced use cases such as custom APIs.
+func (m *DBManager) DB() *gorm.DB {
+	return m.db
 }
 
 // NewDBManager creates a new database manager with the specified database file.
