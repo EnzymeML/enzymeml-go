@@ -1,7 +1,6 @@
 package v2
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -468,7 +467,5 @@ func decodeEntityMap(raw map[string]interface{}, out interface{}) error {
 	if err != nil {
 		return err
 	}
-	dec := json.NewDecoder(bytes.NewReader(b))
-	dec.DisallowUnknownFields()
-	return dec.Decode(out)
+	return json.Unmarshal(b, out)
 }
