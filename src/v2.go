@@ -225,11 +225,11 @@ type MeasurementData struct {
 	SpeciesId   string         `json:"species_id" `
 	Prepared    float64        `json:"prepared,omitempty" `
 	Initial     float64        `json:"initial,omitempty" `
-	DataUnitID  int64          `json:"-"`
+	DataUnitID  string         `json:"-"`
 	DataUnit    UnitDefinition `json:"data_unit,omitempty" gorm:"foreignKey:DataUnitID;"`
 	Data        []float64      `json:"data,omitempty" gorm:"serializer:json;"`
 	Time        []float64      `json:"time,omitempty" gorm:"serializer:json;"`
-	TimeUnitID  int64          `json:"-"`
+	TimeUnitID  string         `json:"-"`
 	TimeUnit    UnitDefinition `json:"time_unit,omitempty" gorm:"foreignKey:TimeUnitID;"`
 	DataType    DataTypes      `json:"data_type,omitempty" `
 	IsSimulated bool           `json:"is_simulated,omitempty" `
@@ -248,7 +248,7 @@ type UnitDefinition struct {
 //
 // Represents a base unit in the unit definition.
 type BaseUnit struct {
-	Id         int64    `json:"-" gorm:"primaryKey;autoIncrement"`
+	Id         string   `json:"id,omitempty" gorm:"primaryKey"`
 	Kind       UnitType `json:"kind" `
 	Exponent   int64    `json:"exponent" `
 	Multiplier float64  `json:"multiplier,omitempty" `
